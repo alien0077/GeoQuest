@@ -20,7 +20,12 @@ function WorldCountryLayer({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/data/countries-110m.json", { signal: controller.signal })
+    const basePath = window.location.pathname.startsWith("/GeoQuest") ? "/GeoQuest/" : "/";
+    fetch(`${basePath}data/countries-110m.json`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`國界資料載入失敗：${response.status}`);
+        return response;
+      })
       .then((response) => response.json() as Promise<WorldTopology>)
       .then(setWorld)
       .catch((error: unknown) => {
