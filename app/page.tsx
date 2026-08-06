@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { geoNaturalEarth1, geoPath } from "d3-geo";
+import { geoCentroid, geoNaturalEarth1, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
+import { countryStudyData, countryStudyNames, taiwanAllyMapNames, type CountryStudy } from "./country-data";
 
 type Continent = { id: string; name: string; english: string; color: string; emoji: string; fact: string };
-type CountryPin = { id: string; name: string; flag: string; continent: string; x: number; y: number; capital: string; fact: string };
+type CountryPin = CountryStudy & { id: string; x: number; y: number };
 type FlagQuestion = { country: string; flag: string; options: string[]; explanation: string };
 type WorldTopology = {
   type: "Topology";
@@ -14,8 +15,23 @@ type WorldTopology = {
   arcs: unknown[];
   transform?: unknown;
 };
+type StudyMode = "continent" | "country" | "allies";
+type Spotlight = { x: number; y: number; label: string };
+type MapCountrySelection = { name: string; x: number; y: number };
 
-function WorldCountryLayer({ className = "" }: { className?: string }) {
+const mapNameByCountryId: Record<string, string> = {
+  ca: "Canada", us: "United States of America", mx: "Mexico", br: "Brazil", ar: "Argentina",
+  fr: "France", it: "Italy", no: "Norway", eg: "Egypt", ng: "Nigeria", za: "South Africa",
+  in: "India", cn: "China", tw: "Taiwan", jp: "Japan", th: "Thailand", au: "Australia", nz: "New Zealand", aq: "Antarctica",
+};
+
+const continentSpotlights: Record<string, Spotlight> = {
+  asia: { x: 71, y: 43, label: "亞洲位置" }, europe: { x: 50, y: 31, label: "歐洲位置" }, africa: { x: 52, y: 62, label: "非洲位置" },
+  "north-america": { x: 20, y: 38, label: "北美洲位置" }, "south-america": { x: 32, y: 70, label: "南美洲位置" },
+  oceania: { x: 80, y: 78, label: "大洋洲位置" }, antarctica: { x: 51, y: 93, label: "南極洲位置" },
+};
+
+function WorldCountryLayer({ className = "", highlightedNames = [], onCountrySelect }: { className?: string; highlightedNames?: string[]; onCountrySelect?: (country: MapCountrySelection) => void }) {
   const [world, setWorld] = useState<WorldTopology | null>(null);
 
   useEffect(() => {
@@ -44,13 +60,20 @@ function WorldCountryLayer({ className = "" }: { className?: string }) {
     const projection = geoNaturalEarth1().fitSize([1000, 520], countries);
     const path = geoPath(projection);
     return countries.features
-      .map((country, index) => ({ id: country.id ?? index, d: path(country) ?? "" }))
+      .map((country, index) => {
+        const point = projection(geoCentroid(country));
+        return { id: country.id ?? index, name: country.properties?.name, x: point?.[0] ?? 500, y: point?.[1] ?? 260, d: path(country) ?? "" };
+      })
       .filter((country) => country.d);
   }, [countries]);
 
   return <svg className={`country-outline-layer ${className}`} viewBox="0 0 1000 520" role="img" aria-label="世界各國國界輪廓">
     <title>世界各國國界輪廓</title>
-    {paths.map((country) => <path key={country.id} d={country.d} className="country-outline" />)}
+    {paths.map((country) => {
+      const countryName = String(country.name);
+      const handleSelect = () => onCountrySelect?.({ name: countryName, x: (country.x / 1000) * 100, y: (country.y / 520) * 100 });
+      return <path key={country.id} d={country.d} className={`country-outline ${countryName === "Taiwan" ? "country-outline-taiwan" : ""} ${highlightedNames.includes(countryName) ? "country-outline-active" : ""}`} onClick={onCountrySelect ? handleSelect : undefined} onKeyDown={onCountrySelect ? (event) => { if (event.key === "Enter" || event.key === " ") handleSelect(); } : undefined} role={onCountrySelect ? "button" : undefined} tabIndex={onCountrySelect ? 0 : undefined} aria-label={onCountrySelect ? `選擇${countryName}` : undefined} />;
+    })}
   </svg>;
 }
 
@@ -64,26 +87,69 @@ const continents: Continent[] = [
   { id: "antarctica", name: "南極洲", english: "ANTARCTICA", color: "#73d0d0", emoji: "🐧", fact: "南極洲幾乎完全被冰雪覆蓋，沒有主權國家。" },
 ];
 
-const countryPins: CountryPin[] = [
-  { id: "ca", name: "加拿大", flag: "🇨🇦", continent: "北美洲", x: 19, y: 29, capital: "渥太華", fact: "世界面積第二大的國家。" },
-  { id: "us", name: "美國", flag: "🇺🇸", continent: "北美洲", x: 21, y: 42, capital: "華盛頓 D.C.", fact: "位於加拿大南方、墨西哥北方。" },
-  { id: "mx", name: "墨西哥", flag: "🇲🇽", continent: "北美洲", x: 24, y: 55, capital: "墨西哥城", fact: "位於北美洲南部，連接中美洲。" },
-  { id: "br", name: "巴西", flag: "🇧🇷", continent: "南美洲", x: 34, y: 69, capital: "巴西利亞", fact: "南美洲面積最大的國家，亞馬遜雨林很大一部分在境內。" },
-  { id: "ar", name: "阿根廷", flag: "🇦🇷", continent: "南美洲", x: 30, y: 84, capital: "布宜諾斯艾利斯", fact: "位於南美洲南部，西側是安地斯山脈。" },
-  { id: "fr", name: "法國", flag: "🇫🇷", continent: "歐洲", x: 47, y: 36, capital: "巴黎", fact: "位於歐洲西部，首都是巴黎。" },
-  { id: "it", name: "義大利", flag: "🇮🇹", continent: "歐洲", x: 51, y: 43, capital: "羅馬", fact: "像靴子形狀的半島國家。" },
-  { id: "no", name: "挪威", flag: "🇳🇴", continent: "歐洲", x: 50, y: 22, capital: "奧斯陸", fact: "位於斯堪地那維亞半島西側。" },
-  { id: "eg", name: "埃及", flag: "🇪🇬", continent: "非洲", x: 53, y: 51, capital: "開羅", fact: "尼羅河流經境內，西奈半島連接亞洲。" },
-  { id: "ng", name: "奈及利亞", flag: "🇳🇬", continent: "非洲", x: 48, y: 61, capital: "阿布加", fact: "位於西非，是非洲人口最多的國家。" },
-  { id: "za", name: "南非", flag: "🇿🇦", continent: "非洲", x: 52, y: 82, capital: "普勒托利亞", fact: "位於非洲最南端附近。" },
-  { id: "in", name: "印度", flag: "🇮🇳", continent: "亞洲", x: 65, y: 52, capital: "新德里", fact: "位於南亞，北側是喜馬拉雅山脈。" },
-  { id: "cn", name: "中國", flag: "🇨🇳", continent: "亞洲", x: 71, y: 40, capital: "北京", fact: "位於東亞，是世界面積最大的國家之一。" },
-  { id: "jp", name: "日本", flag: "🇯🇵", continent: "亞洲", x: 80, y: 42, capital: "東京", fact: "位於亞洲東側，是面向太平洋的島國。" },
-  { id: "th", name: "泰國", flag: "🇹🇭", continent: "亞洲", x: 70, y: 60, capital: "曼谷", fact: "位於東南亞中南半島。" },
-  { id: "au", name: "澳洲", flag: "🇦🇺", continent: "大洋洲", x: 78, y: 78, capital: "坎培拉", fact: "同時是國家與大陸，位於南半球。" },
-  { id: "nz", name: "紐西蘭", flag: "🇳🇿", continent: "大洋洲", x: 88, y: 85, capital: "威靈頓", fact: "位於澳洲東南方的島國。" },
-  { id: "aq", name: "南極洲", flag: "🇦🇶", continent: "南極洲", x: 51, y: 94, capital: "無", fact: "地球最南端的洲，沒有主權國家。" },
-];
+const countryIdByMapName = Object.fromEntries(Object.entries(mapNameByCountryId).map(([id, mapName]) => [mapName, id]));
+const featuredCoordinates: Record<string, { x: number; y: number }> = {
+  Canada: { x: 19, y: 29 }, "United States of America": { x: 21, y: 42 }, Mexico: { x: 24, y: 55 }, Brazil: { x: 34, y: 69 }, Argentina: { x: 30, y: 84 },
+  France: { x: 47, y: 36 }, Italy: { x: 51, y: 43 }, Norway: { x: 50, y: 22 }, Egypt: { x: 53, y: 51 }, Nigeria: { x: 48, y: 61 }, "South Africa": { x: 52, y: 82 },
+  India: { x: 65, y: 52 }, China: { x: 71, y: 40 }, Taiwan: { x: 76, y: 49 }, Japan: { x: 80, y: 42 }, Thailand: { x: 70, y: 60 }, Australia: { x: 78, y: 78 }, "New Zealand": { x: 88, y: 85 }, Antarctica: { x: 51, y: 94 },
+};
+
+function buildCountryPin(mapName: string, x = 50, y = 50, id = countryIdByMapName[mapName] || `map-${mapName}`): CountryPin {
+  const study = countryStudyData[mapName];
+  if (!study) throw new Error(`缺少國家學習資料：${mapName}`);
+  return { ...study, id, x, y };
+}
+
+const countryPins = Object.entries(featuredCoordinates).map(([mapName, position]) => buildCountryPin(mapName, position.x, position.y));
+const allCountryPins = countryStudyNames.map((mapName) => buildCountryPin(mapName, featuredCoordinates[mapName]?.x, featuredCoordinates[mapName]?.y));
+const taiwanAllyCoordinates: Record<string, { x: number; y: number }> = {
+  "Marshall Islands": { x: 88, y: 48 }, Palau: { x: 84, y: 53 }, Tuvalu: { x: 86, y: 65 }, eSwatini: { x: 54, y: 80 }, "Holy See": { x: 49, y: 39 },
+  Belize: { x: 26, y: 52 }, Guatemala: { x: 25, y: 55 }, Haiti: { x: 34, y: 53 }, Paraguay: { x: 32, y: 77 }, "St. Kitts and Nevis": { x: 35, y: 48 }, "Saint Lucia": { x: 35, y: 55 }, "Saint Vincent and the Grenadines": { x: 34, y: 58 },
+};
+const taiwanAllyPins = taiwanAllyMapNames.map((mapName) => buildCountryPin(mapName, taiwanAllyCoordinates[mapName].x, taiwanAllyCoordinates[mapName].y));
+
+function StudyCard({ mode, continent, country, onStart, onSelectCountry, allies, canStart = true }: { mode: StudyMode; continent: Continent; country: CountryPin; onStart: () => void; onSelectCountry: (country: CountryPin) => void; allies: CountryPin[]; canStart?: boolean }) {
+  if (mode === "allies") {
+    return <aside className="country-info study-card ally-study-card">
+      <span className="eyebrow">TAIWAN ALLIES · 台灣邦交國</span>
+      <div className="study-card-icon">🤝</div>
+      <h3>台灣邦交國</h3>
+      <p>先從地圖認識台灣的邦交國分布，再點選任一國家查看完整學習卡片。</p>
+      <div className="ally-summary"><b>{allies.length} 個邦交國</b><span>亞太、非洲、歐洲與拉丁美洲及加勒比海</span></div>
+      <div className="ally-list">{allies.map((ally) => <button key={ally.id} onClick={() => onSelectCountry(ally)}><span>{ally.flag} {ally.name}</span><small>{ally.continent}</small></button>)}</div>
+    </aside>;
+  }
+  if (mode === "continent") {
+    const examples = allCountryPins.filter((item) => item.continent === continent.name).slice(0, 4);
+    return <aside className="country-info study-card">
+      <span className="eyebrow">CONTINENT STUDY · 考前先學習</span>
+      <div className="study-card-icon">{continent.emoji}</div>
+      <h3>{continent.name}</h3>
+      <span className="english">{continent.english}</span>
+      <p>{continent.fact}</p>
+      <div className="study-card-note"><b>在地圖上看</b><span>位於世界地圖的{continent.name}區域，亮起的國家是此洲的學習範例。</span></div>
+      <div className="study-examples">{examples.map((item) => <span key={item.id}>{item.flag} {item.name}</span>)}</div>
+      {canStart ? <button className="primary-button small" onClick={onStart}>學會了，開始定位考驗 →</button> : <div className="study-card-note"><b>學習提示</b><span>先觀察它與台灣及鄰近國家的相對位置。</span></div>}
+    </aside>;
+  }
+
+  return <aside className="country-info study-card">
+    <span className="eyebrow">COUNTRY STUDY · 考前先學習</span>
+    <div className="country-flag-large">{country.flag}</div>
+    <span className="eyebrow">{country.continent}</span>
+    <h3>{country.name}</h3>
+    <div className="country-facts">
+      <p><b>首都</b><span>{country.capital}</span></p>
+      <p><b>人口</b><span>{country.population}</span></p>
+      <p><b>發展概略</b><span>{country.development}</span></p>
+      <p><b>政體</b><span>{country.government}</span></p>
+      <p><b>歷史</b><span>{country.history}</span></p>
+      <p><b>產業／資源</b><span>{country.economy}</span></p>
+    </div>
+    <div className="study-card-note"><b>在地圖上看</b><span>亮起的國家輪廓就是{country.name}的位置。</span></div>
+    {canStart ? <button className="primary-button small" onClick={onStart}>學會了，開始定位考驗 →</button> : <div className="study-card-note"><b>學習提示</b><span>先觀察它與台灣及鄰近國家的相對位置。</span></div>}
+  </aside>;
+}
 
 const flagQuestions: FlagQuestion[] = [
   { country: "日本", flag: "🇯🇵", options: ["日本", "孟加拉", "帛琉", "土耳其"], explanation: "日本國旗是白底紅日，象徵太陽，也呼應日本「日出之國」的稱呼。" },
@@ -108,17 +174,38 @@ export default function Home() {
   const [selectedAnswer, setSelectedAnswer] = useState("");
   const [marker, setMarker] = useState<{ x: number; y: number } | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [studyMode, setStudyMode] = useState<StudyMode>("continent");
+  const [studyContinentId, setStudyContinentId] = useState("asia");
+  const [studyCountryId, setStudyCountryId] = useState("jp");
+  const [studyMapCountry, setStudyMapCountry] = useState<CountryPin | null>(null);
 
   useEffect(() => { localStorage.setItem("geo-quest-progress", JSON.stringify(progress)); }, [progress]);
   const continent = continents[selectedContinent];
   const locationTarget = selectedCountry || countryPins[(selectedContinent + questionIndex) % countryPins.length];
+  const studyContinent = continents.find((item) => item.id === studyContinentId) || continents[0];
+  const studyCountry = studyMapCountry || allCountryPins.find((item) => item.id === studyCountryId) || allCountryPins[0];
+  const studySpotlight = studyMode === "country" ? { x: studyCountry.x, y: studyCountry.y, label: `${studyCountry.name}位置` } : studyMode === "allies" ? { x: 56, y: 58, label: "台灣邦交國分布" } : continentSpotlights[studyContinent.id];
+  const studyHighlightNames = studyMode === "country"
+    ? [studyCountry.mapName]
+    : studyMode === "allies" ? taiwanAllyMapNames : allCountryPins.filter((item) => item.continent === studyContinent.name).map((item) => item.mapName);
   const bossQuestions = useMemo(() => flagQuestions.slice(selectedContinent % 2, (selectedContinent % 2) + 5), [selectedContinent]);
   const flagQuestion = bossQuestions[questionIndex % bossQuestions.length];
   const total = screen === "boss" ? 5 : 3;
 
   function startLocation(index = Math.min(progress.unlocked, continents.length - 1), country: CountryPin | null = null) { setSelectedContinent(index); setSelectedCountry(country); setQuestionIndex(0); setScore(0); setAnswerState("idle"); setMarker(null); setShowHint(false); setScreen("location"); }
   function startBoss() { setQuestionIndex(0); setScore(0); setAnswerState("idle"); setSelectedAnswer(""); setScreen("boss"); }
-  function chooseCountry(country: CountryPin) { setSelectedCountry(country); setSelectedContinent(Math.max(0, continents.findIndex((item) => item.name === country.continent))); }
+  function chooseCountry(country: CountryPin) { setSelectedCountry(country); setStudyMode("country"); setStudyCountryId(country.id); setStudyMapCountry(null); setSelectedContinent(Math.max(0, continents.findIndex((item) => item.name === country.continent))); }
+  function chooseMapCountry(mapCountry: MapCountrySelection) {
+    const country = countryStudyData[mapCountry.name];
+    if (!country) return;
+    const selected = buildCountryPin(mapCountry.name, mapCountry.x, mapCountry.y);
+    chooseCountry(selected);
+    setStudyMapCountry(selected);
+  }
+  function chooseStudyContinent(id: string) { setStudyMode("continent"); setStudyContinentId(id); setStudyMapCountry(null); setSelectedCountry(null); }
+  function chooseStudyAllies() { setStudyMode("allies"); setStudyMapCountry(null); setSelectedCountry(null); }
+  function chooseStudyCountry(id: string) { const country = allCountryPins.find((item) => item.id === id); if (!country) return; setStudyMode("country"); setStudyCountryId(id); setStudyMapCountry(null); setSelectedCountry(null); }
+  function startStudyChallenge() { const target = studyMode === "country" ? studyCountry : allCountryPins.find((item) => item.continent === studyContinent.name) || allCountryPins[0]; const continentIndex = continents.findIndex((item) => item.name === target.continent); if (continentIndex >= 0) startLocation(continentIndex, target); }
   function answerMap(x: number, y: number) { if (answerState !== "idle") return; setMarker({ x, y }); const d = Math.sqrt((x - locationTarget.x) ** 2 + (y - locationTarget.y) ** 2); const correct = d < 9; setAnswerState(correct ? "correct" : "wrong"); if (correct) setScore(score + (showHint ? 70 : 100)); }
   function answerFlag(option: string) { if (answerState !== "idle") return; setSelectedAnswer(option); setAnswerState(option === flagQuestion.country ? "correct" : "wrong"); if (option === flagQuestion.country) setScore(score + 100); }
   function nextQuestion() { if (questionIndex + 1 >= total) { const key = screen === "boss" ? continent.id : `${continent.id}-level`; setProgress((old) => ({ ...old, stars: old.stars + Math.max(1, Math.round(score / 10)), completed: screen === "location" && !old.completed.includes(key) ? [...old.completed, key] : old.completed, bosses: screen === "boss" && !old.bosses.includes(key) ? [...old.bosses, key] : old.bosses, unlocked: Math.min(continents.length, Math.max(old.unlocked, selectedContinent + 2)) })); setScreen("result"); return; } setQuestionIndex(questionIndex + 1); setAnswerState("idle"); setSelectedAnswer(""); setMarker(null); setShowHint(false); }
@@ -128,12 +215,19 @@ export default function Home() {
     <header className="topbar"><button className="brand" onClick={() => setScreen("home")} aria-label="回到世界地圖"><span className="brand-mark">✦</span><span>GeoQuest <small>世界地理探險隊</small></span></button><div className="top-stats"><span>⭐ {progress.stars}</span><span>🏅 {progress.bosses.length}</span><button className="reset-link" onClick={resetProgress}>重置進度</button></div></header>
 
     {screen === "home" && <>
-      <section className="map-hero"><div className="map-hero-copy"><span className="eyebrow">WORLD MAP · 世界任務中心</span><h1>看地圖，<em>玩遍全世界。</em></h1><p>點擊地圖上的國家，認識它在哪一洲；再用位置題與國旗魔王關，挑戰你的地理直覺。</p><button className="primary-button" onClick={() => startLocation()}>開始世界地圖挑戰 <span>→</span></button><div className="map-legend"><span><i className="legend-dot orange" />亞洲</span><span><i className="legend-dot blue" />歐洲</span><span><i className="legend-dot green" />非洲</span><span><i className="legend-dot pink" />美洲</span></div></div><div className="mini-globe"><WorldCountryLayer className="mini-country-layer" /><span>七大洲<br /><b>19 個國家</b></span></div></section>
-      <section className="world-dashboard"><div className="dashboard-head"><div><span className="strip-label">EXPLORE THE WORLD</span><h2>世界互動地圖</h2></div><div className="dashboard-actions"><span>已探索 {progress.completed.length} / 7 洲</span><button onClick={() => startLocation()}>開始定位考驗 →</button></div></div><div className="map-and-info"><div className="interactive-world-map" aria-label="世界互動地圖"><WorldCountryLayer /><div className="map-grid" /><div className="equator" /><span className="equator-label">赤道 EQUATOR</span>{countryPins.map((country) => <button key={country.id} className={`country-pin pin-${country.continent.replace("洲", "")}`} style={{ left: `${country.x}%`, top: `${country.y}%` }} onClick={() => chooseCountry(country)} aria-label={`查看${country.name}`}><i>{country.flag}</i><b>{country.name}</b></button>)}<div className="map-compass">N<br /><span>✦</span></div></div><aside className="country-info">{selectedCountry ? <><div className="country-flag-large">{selectedCountry.flag}</div><span className="eyebrow">{selectedCountry.continent}</span><h3>{selectedCountry.name}</h3><p><b>首都</b> {selectedCountry.capital}</p><p>{selectedCountry.fact}</p><button className="primary-button small" onClick={() => startLocation(continents.findIndex((item) => item.name === selectedCountry.continent), selectedCountry)}>考考我：{selectedCountry.name} →</button></> : <><div className="info-compass">🧭</div><span className="eyebrow">SELECT A COUNTRY</span><h3>點擊地圖上的國家</h3><p>選一個國家查看國旗、首都與地理小知識，再開始定位挑戰。</p><div className="info-tip">💡 先從亞洲試試看！</div></>}</aside></div></section>
+      <section className="map-hero"><div className="map-hero-copy"><span className="eyebrow">WORLD MAP · 世界任務中心</span><h1>看地圖，<em>玩遍全世界。</em></h1><p>點擊地圖上的國家，認識它在哪一洲；再用位置題與國旗魔王關，挑戰你的地理直覺。</p><button className="primary-button" onClick={() => startLocation()}>開始世界地圖挑戰 <span>→</span></button><div className="map-legend"><span><i className="legend-dot orange" />亞洲</span><span><i className="legend-dot blue" />歐洲</span><span><i className="legend-dot green" />非洲</span><span><i className="legend-dot pink" />美洲</span></div></div><div className="mini-globe"><WorldCountryLayer className="mini-country-layer" /><span>七大洲<br /><b>20 個國家</b></span></div></section>
+      <section className="world-dashboard">
+        <div className="dashboard-head"><div><span className="strip-label">BEFORE THE QUIZ</span><h2>考前先學習</h2><p className="dashboard-subtitle">先選一個洲或國家，從地圖認識它的位置，再開始考驗。</p></div><div className="dashboard-actions"><span>已探索 {progress.completed.length} / 7 洲</span><button onClick={() => startLocation()}>直接開始定位 →</button></div></div>
+        <div className="study-toolbar">
+          <div className="study-tabs" role="tablist" aria-label="學習分類"><button className={`study-tab ${studyMode === "continent" ? "active" : ""}`} onClick={() => chooseStudyContinent(studyContinent.id)} role="tab" aria-selected={studyMode === "continent"}>先學七大洲</button><button className={`study-tab ${studyMode === "country" ? "active" : ""}`} onClick={() => chooseStudyCountry(studyCountry.id)} role="tab" aria-selected={studyMode === "country"}>先學國家位置</button><button className={`study-tab ${studyMode === "allies" ? "active" : ""}`} onClick={chooseStudyAllies} role="tab" aria-selected={studyMode === "allies"}>台灣邦交國</button></div>
+          {studyMode === "continent" ? <div className="study-choice-row" aria-label="選擇洲">{continents.map((item) => <button key={item.id} className={`study-choice ${studyContinent.id === item.id ? "active" : ""}`} onClick={() => chooseStudyContinent(item.id)}><span>{item.emoji}</span>{item.name}</button>)}</div> : studyMode === "allies" ? <div className="ally-toolbar"><span>🤝 台灣邦交國</span><b>{taiwanAllyPins.length} 國</b><small>點選地圖標記或右側卡片查看介紹</small></div> : <label className="study-select-label">選擇國家<select value={studyCountry.id} onChange={(event) => chooseStudyCountry(event.target.value)}>{continents.map((item) => <optgroup key={item.id} label={`${item.emoji} ${item.name}`}>{allCountryPins.filter((country) => country.continent === item.name).map((country) => <option key={country.id} value={country.id}>{country.flag} {country.name}</option>)}</optgroup>)}</select></label>}
+        </div>
+        <div className="map-and-info"><div className="interactive-world-map" aria-label="世界互動地圖"><WorldCountryLayer highlightedNames={studyHighlightNames} onCountrySelect={chooseMapCountry} /><div className="map-grid" /><div className="taiwan-reference" style={{ left: "76%", top: "49%" }} aria-label="台灣參照位置"><span>台灣</span></div><div className={`study-spotlight ${studyMode}`} style={{ left: `${studySpotlight.x}%`, top: `${studySpotlight.y}%` }} aria-hidden="true"><span>✦</span></div><span className="study-location-label" style={{ left: `${studySpotlight.x}%`, top: `${studySpotlight.y}%` }}>{studySpotlight.label}</span><div className="equator" /><span className="equator-label">赤道 EQUATOR</span>{studyMode !== "allies" && countryPins.map((country) => <button key={country.id} className={`country-pin pin-${country.continent.replace("洲", "")} ${studyMode === "country" && studyCountry.id === country.id ? "study-selected-pin" : ""}`} style={{ left: `${country.x}%`, top: `${country.y}%` }} onClick={() => chooseCountry(country)} aria-label={`查看${country.name}`}><i>{country.flag}</i><b>{country.name}</b></button>)}{studyMode === "allies" && taiwanAllyPins.map((country) => <button key={country.id} className={`country-pin ally-pin ${studyCountry.id === country.id ? "study-selected-pin" : ""}`} style={{ left: `${country.x}%`, top: `${country.y}%` }} onClick={() => chooseCountry(country)} aria-label={`查看${country.name}`}><i>{country.flag}</i><b>{country.name}</b></button>)}<div className="map-compass">N<br /><span>✦</span></div></div><StudyCard mode={studyMode} continent={studyContinent} country={studyCountry} onStart={startStudyChallenge} onSelectCountry={chooseCountry} allies={taiwanAllyPins} canStart={continents.some((item) => item.name === studyCountry.continent)} /></div>
+      </section>
       <section className="continent-section compact"><div className="section-heading"><div><span className="strip-label">THE SEVEN CONTINENTS</span><h2>七大洲任務</h2></div></div><div className="continent-grid">{continents.map((item, index) => <button className={`continent-card ${index > progress.unlocked ? "locked" : ""}`} key={item.id} style={{ "--card-color": item.color } as React.CSSProperties} onClick={() => index <= progress.unlocked && startLocation(index)}><span className="continent-emoji">{item.emoji}</span><h3>{item.name}</h3><span className="english">{item.english}</span><p>{item.fact}</p><span className="card-footer">{index > progress.unlocked ? "🔒 完成前一洲後解鎖" : "進入任務 →"}</span></button>)}</div></section>
     </>}
 
-    {screen === "location" && <section className="game-screen"><div className="game-header"><button className="back-button" onClick={() => setScreen("home")}>← 返回世界地圖</button><div className="game-progress"><span>📍 {locationTarget.continent}定位任務</span><div><i style={{ width: `${(questionIndex / total) * 100}%` }} /></div><small>{questionIndex + 1} / {total}</small></div><span className="live-score">⭐ {score}</span></div><div className="question-layout"><aside className="mission-aside"><span className="eyebrow">MAP CHALLENGE</span><h2>請在地圖上找到{locationTarget.name}</h2><p>點擊你認為正確的國家位置。答對會獲得地理小知識！</p><div className="tip-box"><span>💡</span><div><b>探險提示</b><p>{showHint ? `${locationTarget.name}的首都是${locationTarget.capital}。` : "需要線索嗎？"}</p></div></div>{!showHint && <button className="text-button" onClick={() => setShowHint(true)}>顯示提示 →</button>}</aside><div className="map-panel"><div className="interactive-world-map game-map"><WorldCountryLayer /><div className="map-grid" />{marker && <span className={`map-pin ${answerState}`} style={{ left: `${marker.x}%`, top: `${marker.y}%` }}>📍</span>} {answerState !== "idle" && <span className="answer-target" style={{ left: `${locationTarget.x}%`, top: `${locationTarget.y}%` }}>◎</span>}<button className="map-click-layer" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); answerMap(((event.clientX - rect.left) / rect.width) * 100, ((event.clientY - rect.top) / rect.height * 100)); }} aria-label="點擊世界地圖回答" /></div>{answerState !== "idle" && <div className={`feedback ${answerState}`}><span>{answerState === "correct" ? "🎉" : "🧭"}</span><div><b>{answerState === "correct" ? "定位成功！" : `差一點！正確答案是${locationTarget.name}`}</b><p>{locationTarget.fact}</p></div><button onClick={nextQuestion}>{questionIndex + 1 >= total ? "完成任務" : "下一題 →"}</button></div>}</div></div></section>}
+    {screen === "location" && <section className="game-screen"><div className="game-header"><button className="back-button" onClick={() => setScreen("home")}>← 返回世界地圖</button><div className="game-progress"><span>📍 {locationTarget.continent}定位任務</span><div><i style={{ width: `${(questionIndex / total) * 100}%` }} /></div><small>{questionIndex + 1} / {total}</small></div><span className="live-score">⭐ {score}</span></div><div className="question-layout"><aside className="mission-aside"><span className="eyebrow">MAP CHALLENGE</span><h2>請在地圖上找到{locationTarget.name}</h2><p>點擊你認為正確的國家位置。答對會獲得地理小知識！</p><div className="tip-box"><span>💡</span><div><b>探險提示</b><p>{showHint ? `${locationTarget.name}的首都是${locationTarget.capital}。` : "需要線索嗎？"}</p></div></div>{!showHint && <button className="text-button" onClick={() => setShowHint(true)}>顯示提示 →</button>}</aside><div className="map-panel"><div className="interactive-world-map game-map"><WorldCountryLayer /><div className="map-grid" />{marker && <span className={`map-pin ${answerState}`} style={{ left: `${marker.x}%`, top: `${marker.y}%` }}>📍</span>} {answerState !== "idle" && <span className="answer-target" style={{ left: `${locationTarget.x}%`, top: `${locationTarget.y}%` }}>◎</span>}<button className="map-click-layer" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); answerMap(((event.clientX - rect.left) / rect.width) * 100, ((event.clientY - rect.top) / rect.height * 100)); }} aria-label="點擊世界地圖回答" /></div>{answerState !== "idle" && <div className={`feedback ${answerState}`}><span>{answerState === "correct" ? "🎉" : "🧭"}</span><div><b>{answerState === "correct" ? "定位成功！" : `差一點！正確答案是${locationTarget.name}`}</b><p>{locationTarget.history}</p></div><button onClick={nextQuestion}>{questionIndex + 1 >= total ? "完成任務" : "下一題 →"}</button></div>}</div></div></section>}
 
     {screen === "boss" && <section className="game-screen boss-screen"><div className="game-header"><button className="back-button" onClick={() => setScreen("home")}>← 返回世界地圖</button><div className="game-progress"><span>⚔️ {continent.name}國旗魔王</span><div><i style={{ width: `${(questionIndex / total) * 100}%` }} /></div><small>{questionIndex + 1} / {total}</small></div><span className="live-score">⭐ {score}</span></div><div className="boss-intro"><span className="eyebrow">FLAG BOSS · FINAL CHECK</span><h1>國旗辨識魔王關</h1><p>看國旗，選出正確的國家。</p></div><div className="flag-card"><div className="flag-visual">{flagQuestion.flag}</div><div className="flag-question"><span>這是哪一個國家的國旗？</span><h2>選出正確答案</h2><div className="flag-options">{flagQuestion.options.map((option) => <button key={option} className={selectedAnswer === option ? answerState : ""} disabled={answerState !== "idle"} onClick={() => answerFlag(option)}>{option}</button>)}</div>{answerState !== "idle" && <div className={`flag-feedback ${answerState}`}><b>{answerState === "correct" ? "答對了！國旗偵探 🔥" : `答案是：${flagQuestion.country}`}</b><p>{flagQuestion.explanation}</p><button className="primary-button small" onClick={nextQuestion}>{questionIndex + 1 >= total ? "完成魔王關" : "下一面旗 →"}</button></div>}</div></div></section>}
 
