@@ -6,7 +6,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
@@ -27,14 +29,23 @@ jobs:
         run: npm ci
       - name: Build static site
         run: npm run build
-      - name: Remove non-static runtime artifacts
-        run: rm -rf dist/client/.vite dist/client/index.rsc && rm -f dist/client/_headers dist/client/.assetsignore
-      - name: Prefix GitHub Pages asset URLs
-        run: sed -i 's#"/assets/#"/GeoQuest/assets/#g; s#"/favicon#"/GeoQuest/favicon#g' dist/client/index.html
-      - name: Publish to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Prepare GitHub Pages paths
+        run: |
+          rm -rf dist/client/.vite dist/client/index.rsc
+          rm -f dist/client/_headers dist/client/.assetsignore
+          sed -i 's#"/assets/#"/GeoQuest/assets/#g; s#"/favicon#"/GeoQuest/favicon#g' dist/client/index.html
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist/client
-          publish_branch: gh-pages
-          force_orphan: true
+          path: ./dist/client
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
