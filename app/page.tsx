@@ -1,10 +1,53 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { geoNaturalEarth1, geoPath } from "d3-geo";
+import { feature } from "topojson-client";
+import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 
 type Continent = { id: string; name: string; english: string; color: string; emoji: string; fact: string };
 type CountryPin = { id: string; name: string; flag: string; continent: string; x: number; y: number; capital: string; fact: string };
 type FlagQuestion = { country: string; flag: string; options: string[]; explanation: string };
+type WorldTopology = {
+  type: "Topology";
+  objects: { countries: { type: "GeometryCollection"; geometries: unknown[] } };
+  arcs: unknown[];
+  transform?: unknown;
+};
+
+function WorldCountryLayer({ className = "" }: { className?: string }) {
+  const [world, setWorld] = useState<WorldTopology | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/data/countries-110m.json", { signal: controller.signal })
+      .then((response) => response.json() as Promise<WorldTopology>)
+      .then(setWorld)
+      .catch((error: unknown) => {
+        if ((error as { name?: string }).name !== "AbortError") console.error("無法載入世界國界資料", error);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const countries = useMemo(() => {
+    if (!world) return null;
+    return feature(world as never, world.objects.countries as never) as unknown as FeatureCollection<Geometry, GeoJsonProperties>;
+  }, [world]);
+
+  const paths = useMemo(() => {
+    if (!countries) return [];
+    const projection = geoNaturalEarth1().fitSize([1000, 520], countries);
+    const path = geoPath(projection);
+    return countries.features
+      .map((country, index) => ({ id: country.id ?? index, d: path(country) ?? "" }))
+      .filter((country) => country.d);
+  }, [countries]);
+
+  return <svg className={`country-outline-layer ${className}`} viewBox="0 0 1000 520" role="img" aria-label="世界各國國界輪廓">
+    <title>世界各國國界輪廓</title>
+    {paths.map((country) => <path key={country.id} d={country.d} className="country-outline" />)}
+  </svg>;
+}
 
 const continents: Continent[] = [
   { id: "asia", name: "亞洲", english: "ASIA", color: "#f28b55", emoji: "🌅", fact: "亞洲是面積最大、人口最多的洲，珠穆朗瑪峰也在這裡。" },
@@ -80,12 +123,12 @@ export default function Home() {
     <header className="topbar"><button className="brand" onClick={() => setScreen("home")} aria-label="回到世界地圖"><span className="brand-mark">✦</span><span>GeoQuest <small>世界地理探險隊</small></span></button><div className="top-stats"><span>⭐ {progress.stars}</span><span>🏅 {progress.bosses.length}</span><button className="reset-link" onClick={resetProgress}>重置進度</button></div></header>
 
     {screen === "home" && <>
-      <section className="map-hero"><div className="map-hero-copy"><span className="eyebrow">WORLD MAP · 世界任務中心</span><h1>看地圖，<em>玩遍全世界。</em></h1><p>點擊地圖上的國家，認識它在哪一洲；再用位置題與國旗魔王關，挑戰你的地理直覺。</p><button className="primary-button" onClick={() => startLocation()}>開始世界地圖挑戰 <span>→</span></button><div className="map-legend"><span><i className="legend-dot orange" />亞洲</span><span><i className="legend-dot blue" />歐洲</span><span><i className="legend-dot green" />非洲</span><span><i className="legend-dot pink" />美洲</span></div></div><div className="mini-globe">🌍<span>七大洲<br /><b>19 個國家</b></span></div></section>
-      <section className="world-dashboard"><div className="dashboard-head"><div><span className="strip-label">EXPLORE THE WORLD</span><h2>世界互動地圖</h2></div><div className="dashboard-actions"><span>已探索 {progress.completed.length} / 7 洲</span><button onClick={() => startLocation()}>開始定位考驗 →</button></div></div><div className="map-and-info"><div className="interactive-world-map" aria-label="世界互動地圖"><div className="map-grid" /><div className="land land-na" /><div className="land land-sa" /><div className="land land-eu" /><div className="land land-af" /><div className="land land-asia" /><div className="land land-au" /><div className="land land-greenland" /><div className="equator" /><span className="equator-label">赤道 EQUATOR</span>{countryPins.map((country) => <button key={country.id} className={`country-pin pin-${country.continent.replace("洲", "")}`} style={{ left: `${country.x}%`, top: `${country.y}%` }} onClick={() => chooseCountry(country)} aria-label={`查看${country.name}`}><i>{country.flag}</i><b>{country.name}</b></button>)}<div className="map-compass">N<br /><span>✦</span></div></div><aside className="country-info">{selectedCountry ? <><div className="country-flag-large">{selectedCountry.flag}</div><span className="eyebrow">{selectedCountry.continent}</span><h3>{selectedCountry.name}</h3><p><b>首都</b> {selectedCountry.capital}</p><p>{selectedCountry.fact}</p><button className="primary-button small" onClick={() => startLocation(continents.findIndex((item) => item.name === selectedCountry.continent), selectedCountry)}>考考我：{selectedCountry.name} →</button></> : <><div className="info-compass">🧭</div><span className="eyebrow">SELECT A COUNTRY</span><h3>點擊地圖上的國家</h3><p>選一個國家查看國旗、首都與地理小知識，再開始定位挑戰。</p><div className="info-tip">💡 先從亞洲試試看！</div></>}</aside></div></section>
+      <section className="map-hero"><div className="map-hero-copy"><span className="eyebrow">WORLD MAP · 世界任務中心</span><h1>看地圖，<em>玩遍全世界。</em></h1><p>點擊地圖上的國家，認識它在哪一洲；再用位置題與國旗魔王關，挑戰你的地理直覺。</p><button className="primary-button" onClick={() => startLocation()}>開始世界地圖挑戰 <span>→</span></button><div className="map-legend"><span><i className="legend-dot orange" />亞洲</span><span><i className="legend-dot blue" />歐洲</span><span><i className="legend-dot green" />非洲</span><span><i className="legend-dot pink" />美洲</span></div></div><div className="mini-globe"><WorldCountryLayer className="mini-country-layer" /><span>七大洲<br /><b>19 個國家</b></span></div></section>
+      <section className="world-dashboard"><div className="dashboard-head"><div><span className="strip-label">EXPLORE THE WORLD</span><h2>世界互動地圖</h2></div><div className="dashboard-actions"><span>已探索 {progress.completed.length} / 7 洲</span><button onClick={() => startLocation()}>開始定位考驗 →</button></div></div><div className="map-and-info"><div className="interactive-world-map" aria-label="世界互動地圖"><WorldCountryLayer /><div className="map-grid" /><div className="equator" /><span className="equator-label">赤道 EQUATOR</span>{countryPins.map((country) => <button key={country.id} className={`country-pin pin-${country.continent.replace("洲", "")}`} style={{ left: `${country.x}%`, top: `${country.y}%` }} onClick={() => chooseCountry(country)} aria-label={`查看${country.name}`}><i>{country.flag}</i><b>{country.name}</b></button>)}<div className="map-compass">N<br /><span>✦</span></div></div><aside className="country-info">{selectedCountry ? <><div className="country-flag-large">{selectedCountry.flag}</div><span className="eyebrow">{selectedCountry.continent}</span><h3>{selectedCountry.name}</h3><p><b>首都</b> {selectedCountry.capital}</p><p>{selectedCountry.fact}</p><button className="primary-button small" onClick={() => startLocation(continents.findIndex((item) => item.name === selectedCountry.continent), selectedCountry)}>考考我：{selectedCountry.name} →</button></> : <><div className="info-compass">🧭</div><span className="eyebrow">SELECT A COUNTRY</span><h3>點擊地圖上的國家</h3><p>選一個國家查看國旗、首都與地理小知識，再開始定位挑戰。</p><div className="info-tip">💡 先從亞洲試試看！</div></>}</aside></div></section>
       <section className="continent-section compact"><div className="section-heading"><div><span className="strip-label">THE SEVEN CONTINENTS</span><h2>七大洲任務</h2></div></div><div className="continent-grid">{continents.map((item, index) => <button className={`continent-card ${index > progress.unlocked ? "locked" : ""}`} key={item.id} style={{ "--card-color": item.color } as React.CSSProperties} onClick={() => index <= progress.unlocked && startLocation(index)}><span className="continent-emoji">{item.emoji}</span><h3>{item.name}</h3><span className="english">{item.english}</span><p>{item.fact}</p><span className="card-footer">{index > progress.unlocked ? "🔒 完成前一洲後解鎖" : "進入任務 →"}</span></button>)}</div></section>
     </>}
 
-    {screen === "location" && <section className="game-screen"><div className="game-header"><button className="back-button" onClick={() => setScreen("home")}>← 返回世界地圖</button><div className="game-progress"><span>📍 {locationTarget.continent}定位任務</span><div><i style={{ width: `${(questionIndex / total) * 100}%` }} /></div><small>{questionIndex + 1} / {total}</small></div><span className="live-score">⭐ {score}</span></div><div className="question-layout"><aside className="mission-aside"><span className="eyebrow">MAP CHALLENGE</span><h2>請在地圖上找到{locationTarget.name}</h2><p>點擊你認為正確的國家位置。答對會獲得地理小知識！</p><div className="tip-box"><span>💡</span><div><b>探險提示</b><p>{showHint ? `${locationTarget.name}的首都是${locationTarget.capital}。` : "需要線索嗎？"}</p></div></div>{!showHint && <button className="text-button" onClick={() => setShowHint(true)}>顯示提示 →</button>}</aside><div className="map-panel"><div className="interactive-world-map game-map"><div className="map-grid" /><div className="land land-na" /><div className="land land-sa" /><div className="land land-eu" /><div className="land land-af" /><div className="land land-asia" /><div className="land land-au" /><div className="land land-greenland" />{marker && <span className={`map-pin ${answerState}`} style={{ left: `${marker.x}%`, top: `${marker.y}%` }}>📍</span>} {answerState !== "idle" && <span className="answer-target" style={{ left: `${locationTarget.x}%`, top: `${locationTarget.y}%` }}>◎</span>}<button className="map-click-layer" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); answerMap(((event.clientX - rect.left) / rect.width) * 100, ((event.clientY - rect.top) / rect.height * 100)); }} aria-label="點擊世界地圖回答" /></div>{answerState !== "idle" && <div className={`feedback ${answerState}`}><span>{answerState === "correct" ? "🎉" : "🧭"}</span><div><b>{answerState === "correct" ? "定位成功！" : `差一點！正確答案是${locationTarget.name}`}</b><p>{locationTarget.fact}</p></div><button onClick={nextQuestion}>{questionIndex + 1 >= total ? "完成任務" : "下一題 →"}</button></div>}</div></div></section>}
+    {screen === "location" && <section className="game-screen"><div className="game-header"><button className="back-button" onClick={() => setScreen("home")}>← 返回世界地圖</button><div className="game-progress"><span>📍 {locationTarget.continent}定位任務</span><div><i style={{ width: `${(questionIndex / total) * 100}%` }} /></div><small>{questionIndex + 1} / {total}</small></div><span className="live-score">⭐ {score}</span></div><div className="question-layout"><aside className="mission-aside"><span className="eyebrow">MAP CHALLENGE</span><h2>請在地圖上找到{locationTarget.name}</h2><p>點擊你認為正確的國家位置。答對會獲得地理小知識！</p><div className="tip-box"><span>💡</span><div><b>探險提示</b><p>{showHint ? `${locationTarget.name}的首都是${locationTarget.capital}。` : "需要線索嗎？"}</p></div></div>{!showHint && <button className="text-button" onClick={() => setShowHint(true)}>顯示提示 →</button>}</aside><div className="map-panel"><div className="interactive-world-map game-map"><WorldCountryLayer /><div className="map-grid" />{marker && <span className={`map-pin ${answerState}`} style={{ left: `${marker.x}%`, top: `${marker.y}%` }}>📍</span>} {answerState !== "idle" && <span className="answer-target" style={{ left: `${locationTarget.x}%`, top: `${locationTarget.y}%` }}>◎</span>}<button className="map-click-layer" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); answerMap(((event.clientX - rect.left) / rect.width) * 100, ((event.clientY - rect.top) / rect.height * 100)); }} aria-label="點擊世界地圖回答" /></div>{answerState !== "idle" && <div className={`feedback ${answerState}`}><span>{answerState === "correct" ? "🎉" : "🧭"}</span><div><b>{answerState === "correct" ? "定位成功！" : `差一點！正確答案是${locationTarget.name}`}</b><p>{locationTarget.fact}</p></div><button onClick={nextQuestion}>{questionIndex + 1 >= total ? "完成任務" : "下一題 →"}</button></div>}</div></div></section>}
 
     {screen === "boss" && <section className="game-screen boss-screen"><div className="game-header"><button className="back-button" onClick={() => setScreen("home")}>← 返回世界地圖</button><div className="game-progress"><span>⚔️ {continent.name}國旗魔王</span><div><i style={{ width: `${(questionIndex / total) * 100}%` }} /></div><small>{questionIndex + 1} / {total}</small></div><span className="live-score">⭐ {score}</span></div><div className="boss-intro"><span className="eyebrow">FLAG BOSS · FINAL CHECK</span><h1>國旗辨識魔王關</h1><p>看國旗，選出正確的國家。</p></div><div className="flag-card"><div className="flag-visual">{flagQuestion.flag}</div><div className="flag-question"><span>這是哪一個國家的國旗？</span><h2>選出正確答案</h2><div className="flag-options">{flagQuestion.options.map((option) => <button key={option} className={selectedAnswer === option ? answerState : ""} disabled={answerState !== "idle"} onClick={() => answerFlag(option)}>{option}</button>)}</div>{answerState !== "idle" && <div className={`flag-feedback ${answerState}`}><b>{answerState === "correct" ? "答對了！國旗偵探 🔥" : `答案是：${flagQuestion.country}`}</b><p>{flagQuestion.explanation}</p><button className="primary-button small" onClick={nextQuestion}>{questionIndex + 1 >= total ? "完成魔王關" : "下一面旗 →"}</button></div>}</div></div></section>}
 
