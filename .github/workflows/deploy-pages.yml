@@ -29,6 +29,8 @@ jobs:
         run: npm run build
       - name: Remove non-static runtime artifacts
         run: rm -rf dist/client/.vite dist/client/index.rsc && rm -f dist/client/_headers dist/client/.assetsignore
+      - name: Prefix GitHub Pages asset URLs
+        run: sed -i 's#"/assets/#"/GeoQuest/assets/#g; s#"/favicon#"/GeoQuest/favicon#g' dist/client/index.html
       - name: Publish to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
