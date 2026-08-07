@@ -93,7 +93,7 @@ button { font: inherit; cursor: pointer; }
 .mini-country-layer .country-outline-muted.country-outline-taiwan { fill: #afc8c5; stroke: #789994; }
 .interactive-world-map { aspect-ratio: 1000 / 520; }
 .map-leader-line { position: absolute; z-index: 5; height: 1px; background: #65879a; transform-origin: left center; pointer-events: none; opacity: .78; }
-.country-outline-active { fill: #b9e1ec; stroke: #347f9d; stroke-width: 1.9; }
+.country-outline-active { fill: #d9c4ee; stroke: #7d4caf; stroke-width: 1.9; }
 .country-outline-selected { fill: #83d09b; stroke: #23764c; stroke-width: 2.6; filter: drop-shadow(0 0 3px #23764c80); }
 .country-outline-taiwan.country-outline-selected { fill: #83d09b; stroke: #23764c; }
 .study-selected-pin { outline: 2px solid #23764c; box-shadow: 0 0 0 4px #83d09b50, 0 7px 18px #263a4a38; }
