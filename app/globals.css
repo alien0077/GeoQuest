@@ -43,7 +43,7 @@ button { font: inherit; cursor: pointer; }
 .country-outline-active { fill: #f3bd5b; stroke: #8f641f; stroke-width: 1.8; }
 .country-outline-taiwan { fill: #ed8d91; stroke: #a83f4b; stroke-width: 2.2; }
 .country-outline { pointer-events: auto; cursor: pointer; }
-.mini-country-layer { opacity: .9; transform: rotate(7deg) scale(1.28); }
+.mini-country-layer { opacity: .9; transform: rotate(7deg) scale(1.08); transform-origin: center; }
 .dashboard-subtitle { color: #8a96a2; font-size: 11px; margin: 7px 0 0; }
 .study-toolbar { background: #fffdf7; border: 1px solid #eee6d4; border-radius: 14px; padding: 14px; margin-bottom: 15px; }
 .study-tabs { display: flex; gap: 8px; margin-bottom: 13px; }

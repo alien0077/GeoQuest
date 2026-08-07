@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { geoCentroid, geoNaturalEarth1, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
@@ -32,7 +32,7 @@ const continentSpotlights: Record<string, Spotlight> = {
   oceania: { x: 80, y: 78, label: "大洋洲位置" }, antarctica: { x: 51, y: 93, label: "南極洲位置" },
 };
 
-function WorldCountryLayer({ className = "", highlightedNames = [], selectedName, muted = false, onCountrySelect, onCountryPositions }: { className?: string; highlightedNames?: string[]; selectedName?: string; muted?: boolean; onCountrySelect?: (country: MapCountrySelection) => void; onCountryPositions?: (positions: Record<string, MapPosition>) => void }) {
+function WorldCountryLayer({ className = "", highlightedNames = [], selectedName, muted = false, preserveAspectRatio = "none", onCountrySelect, onCountryPositions }: { className?: string; highlightedNames?: string[]; selectedName?: string; muted?: boolean; preserveAspectRatio?: "none" | "xMidYMid meet"; onCountrySelect?: (country: MapCountrySelection) => void; onCountryPositions?: (positions: Record<string, MapPosition>) => void }) {
   const [world, setWorld] = useState<WorldTopology | null>(null);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ function WorldCountryLayer({ className = "", highlightedNames = [], selectedName
     if (onCountryPositions && paths.length) onCountryPositions(Object.fromEntries(paths.map((country) => [String(country.name), { x: (country.x / 1000) * 100, y: (country.y / 520) * 100 }])));
   }, [onCountryPositions, paths]);
 
-  return <svg className={`country-outline-layer ${className}`} viewBox="0 0 1000 520" preserveAspectRatio="none" role="img" aria-label="世界各國國界輪廓">
+  return <svg className={`country-outline-layer ${className}`} viewBox="0 0 1000 520" preserveAspectRatio={preserveAspectRatio} role="img" aria-label="世界各國國界輪廓">
     <title>世界各國國界輪廓</title>
     {paths.map((country) => {
       const countryName = String(country.name);
@@ -210,11 +210,22 @@ function buildFlagQuestionSet(continentName: string) {
   });
 }
 
+function buildInitialFlagQuestionSet(continentName: string) {
+  const countryPool = allCountryPins.filter((country) => country.continent === continentName);
+  const questionPool = countryPool.length >= 5 ? countryPool : allCountryPins;
+  return questionPool.slice(0, 5).map((country, index) => {
+    const distractors = questionPool.filter((candidate) => candidate.id !== country.id).slice(index, index + 3).map((candidate) => candidate.name);
+    const base = flagQuestionPool.find((question) => question.country === country.name) || flagQuestionPool[0];
+    return { ...base, options: [country.name, ...distractors] };
+  });
+}
+
 const defaultProgress = { stars: 0, completed: [] as string[], bosses: [] as string[], unlocked: 0 };
 function readProgress() { if (typeof window === "undefined") return defaultProgress; try { return { ...defaultProgress, ...JSON.parse(localStorage.getItem("geo-quest-progress") || "{}") }; } catch { return defaultProgress; } }
 
 export default function Home() {
-  const [progress, setProgress] = useState(() => readProgress());
+  const [progress, setProgress] = useState(defaultProgress);
+  const [progressLoaded, setProgressLoaded] = useState(false);
   const [screen, setScreen] = useState<"home" | "location" | "boss" | "result">("home");
   const [selectedCountry, setSelectedCountry] = useState<CountryPin | null>(null);
   const [selectedContinent, setSelectedContinent] = useState(0);
@@ -230,9 +241,10 @@ export default function Home() {
   const [studyCountryId, setStudyCountryId] = useState("jp");
   const [studyMapCountry, setStudyMapCountry] = useState<CountryPin | null>(null);
   const [mapPositions, setMapPositions] = useState<Record<string, MapPosition>>({});
-  const [bossQuestions, setBossQuestions] = useState<FlagQuestion[]>(() => buildFlagQuestionSet(continents[0].name));
+  const [bossQuestions, setBossQuestions] = useState<FlagQuestion[]>(() => buildInitialFlagQuestionSet(continents[0].name));
 
-  useEffect(() => { localStorage.setItem("geo-quest-progress", JSON.stringify(progress)); }, [progress]);
+  useEffect(() => { const storedProgress = readProgress(); startTransition(() => { setProgress(storedProgress); setProgressLoaded(true); }); }, []);
+  useEffect(() => { if (progressLoaded) localStorage.setItem("geo-quest-progress", JSON.stringify(progress)); }, [progress, progressLoaded]);
   const continent = continents[selectedContinent];
   const scheduledTarget = locationQuestions[questionIndex] || selectedCountry || countryPins[(selectedContinent + questionIndex) % countryPins.length];
   const locationTarget = { ...scheduledTarget, ...(mapPositions[scheduledTarget.mapName] || {}) };
@@ -276,7 +288,7 @@ export default function Home() {
     <header className="topbar"><button className="brand" onClick={() => setScreen("home")} aria-label="回到世界地圖"><span className="brand-mark">✦</span><span>GeoQuest <small>世界地理探險隊</small></span></button><div className="top-stats"><span>⭐ {progress.stars}</span><span>🏅 {progress.bosses.length}</span><button className="reset-link" onClick={resetProgress}>重置進度</button></div></header>
 
     {screen === "home" && <>
-      <section className="map-hero"><div className="map-hero-copy"><span className="eyebrow">WORLD MAP · 世界任務中心</span><h1>看地圖，<em>玩遍全世界。</em></h1><p>點擊地圖上的國家，認識它在哪一洲；再用位置題與國旗魔王關，挑戰你的地理直覺。</p><button className="primary-button" onClick={() => startLocation()}>開始世界地圖挑戰 <span>→</span></button><div className="map-legend"><span><i className="legend-dot orange" />亞洲</span><span><i className="legend-dot blue" />歐洲</span><span><i className="legend-dot green" />非洲</span><span><i className="legend-dot pink" />美洲</span></div></div><div className="mini-globe"><WorldCountryLayer className="mini-country-layer" muted /><span>七大洲<br /><b>20 個國家</b></span></div></section>
+      <section className="map-hero"><div className="map-hero-copy"><span className="eyebrow">WORLD MAP · 世界任務中心</span><h1>看地圖，<em>玩遍全世界。</em></h1><p>點擊地圖上的國家，認識它在哪一洲；再用位置題與國旗魔王關，挑戰你的地理直覺。</p><button className="primary-button" onClick={() => startLocation()}>開始世界地圖挑戰 <span>→</span></button><div className="map-legend"><span><i className="legend-dot orange" />亞洲</span><span><i className="legend-dot blue" />歐洲</span><span><i className="legend-dot green" />非洲</span><span><i className="legend-dot pink" />美洲</span></div></div><div className="mini-globe"><WorldCountryLayer className="mini-country-layer" muted preserveAspectRatio="xMidYMid meet" /><span>七大洲<br /><b>20 個國家</b></span></div></section>
       <section className="world-dashboard">
         <div className="dashboard-head"><div><span className="strip-label">BEFORE THE QUIZ</span><h2>考前先學習</h2><p className="dashboard-subtitle">先選一個洲或國家，從地圖認識它的位置，再開始考驗。</p></div><div className="dashboard-actions"><span>已探索 {progress.completed.length} / 7 洲</span><button onClick={() => startLocation()}>直接開始定位 →</button></div></div>
         <div className="study-toolbar">
