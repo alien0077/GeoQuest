@@ -63,6 +63,7 @@ button { font: inherit; cursor: pointer; }
 .study-spotlight span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #a8731d; font-size: 21px; }
 .study-location-label { position: absolute; z-index: 5; transform: translate(-50%, 35px); background: #fff9e8; border: 1px solid #e6c46a; color: #9a721f; border-radius: 20px; padding: 4px 8px; font-size: 9px; font-weight: 800; white-space: nowrap; pointer-events: none; }
 .study-selected-pin { z-index: 9; outline: 2px solid #e3a72e; box-shadow: 0 6px 18px #76511d45; transform: translate(-50%, -50%) scale(1.14); }
+.taiwan-pin { border-color: #3f9bad; background: #effcff; box-shadow: 0 0 0 3px #77cbd044, 0 5px 15px #263a4a27; }
 .taiwan-reference { position: absolute; z-index: 5; transform: translate(-50%, -50%); pointer-events: none; display: grid; justify-items: center; gap: 2px; color: #9c3944; font-size: 8px; font-weight: 900; }
 .taiwan-reference::before { content: ""; width: 10px; height: 10px; border: 2px solid #a83f4b; background: #f7b0b3; border-radius: 50%; box-shadow: 0 0 0 4px #ef8e9438; animation: taiwan-pulse 1.8s ease-in-out infinite; }
 .taiwan-reference span { background: #fff0ef; border: 1px solid #e6a2a5; border-radius: 10px; padding: 2px 5px; white-space: nowrap; }
@@ -88,6 +89,8 @@ button { font: inherit; cursor: pointer; }
 @keyframes study-pulse { 0%, 100% { box-shadow: 0 0 0 8px #f3bd5b22, 0 4px 15px #8e672c30; } 50% { box-shadow: 0 0 0 14px #f3bd5b10, 0 4px 17px #8e672c40; } }
 @keyframes taiwan-pulse { 0%, 100% { box-shadow: 0 0 0 4px #ef8e9438; } 50% { box-shadow: 0 0 0 8px #ef8e9415; } }
 .map-grid { pointer-events: none; }
+.mini-country-layer .country-outline-muted { fill: #afc8c5; stroke: #789994; stroke-width: .85; }
+.mini-country-layer .country-outline-muted.country-outline-taiwan { fill: #afc8c5; stroke: #789994; }
 .interactive-world-map { aspect-ratio: 1000 / 520; }
 .map-leader-line { position: absolute; z-index: 5; height: 1px; background: #65879a; transform-origin: left center; pointer-events: none; opacity: .78; }
 .country-outline-active { fill: #b9e1ec; stroke: #347f9d; stroke-width: 1.9; }
