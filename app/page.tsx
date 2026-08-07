@@ -108,8 +108,8 @@ function buildCountryPin(mapName: string, x = 50, y = 50, id = countryIdByMapNam
 const countryPins = Object.entries(featuredCoordinates).map(([mapName, position]) => buildCountryPin(mapName, position.x, position.y));
 const allCountryPins = countryStudyNames.map((mapName) => buildCountryPin(mapName, featuredCoordinates[mapName]?.x, featuredCoordinates[mapName]?.y));
 const taiwanAllyCoordinates: Record<string, { x: number; y: number }> = {
-  "Marshall Islands": { x: 88, y: 48 }, Palau: { x: 84, y: 53 }, Tuvalu: { x: 86, y: 65 }, eSwatini: { x: 54, y: 80 }, "Holy See": { x: 49, y: 39 },
-  Belize: { x: 26, y: 52 }, Guatemala: { x: 25, y: 55 }, Haiti: { x: 34, y: 53 }, Paraguay: { x: 32, y: 77 }, "St. Kitts and Nevis": { x: 35, y: 48 }, "Saint Lucia": { x: 35, y: 55 }, "Saint Vincent and the Grenadines": { x: 34, y: 58 },
+  "Marshall Islands": { x: 98.02, y: 44.76 }, Palau: { x: 87.74, y: 44.52 }, Tuvalu: { x: 100.21, y: 54.55 }, eSwatini: { x: 54, y: 80 }, "Holy See": { x: 53.2, y: 22.93 },
+  Belize: { x: 26, y: 52 }, Guatemala: { x: 25, y: 55 }, Haiti: { x: 34, y: 53 }, Paraguay: { x: 32, y: 77 }, "St. Kitts and Nevis": { x: 32.6, y: 38.35 }, "Saint Lucia": { x: 33.01, y: 40.52 }, "Saint Vincent and the Grenadines": { x: 32.92, y: 40.99 },
 };
 const taiwanAllyPins = taiwanAllyMapNames.map((mapName) => buildCountryPin(mapName, taiwanAllyCoordinates[mapName].x, taiwanAllyCoordinates[mapName].y));
 const taiwanPin = countryPins.find((country) => country.mapName === "Taiwan") || buildCountryPin("Taiwan");
@@ -132,7 +132,26 @@ function MapCountryMarker({ country, anchor, selected, ally = false, taiwan = fa
   </>;
 }
 
-function StudyCard({ mode, continent, country, onStart, onSelectCountry, allies, canStart = true }: { mode: StudyMode; continent: Continent; country: CountryPin; onStart: () => void; onSelectCountry: (country: CountryPin) => void; allies: CountryPin[]; canStart?: boolean }) {
+function StudyCard({ mode, continent, country, onStart, onSelectCountry, allies, selectedAlly, onClearAlly, canStart = true }: { mode: StudyMode; continent: Continent; country: CountryPin; onStart: () => void; onSelectCountry: (country: CountryPin) => void; allies: CountryPin[]; selectedAlly: CountryPin | null; onClearAlly: () => void; canStart?: boolean }) {
+  if (mode === "allies" && selectedAlly) {
+    return <aside className="country-info study-card ally-country-study-card">
+      <span className="eyebrow">TAIWAN ALLIES · 台灣邦交國</span>
+      <div className="country-flag-large">{selectedAlly.flag}</div>
+      <span className="eyebrow">{selectedAlly.continent}</span>
+      <h3>{selectedAlly.name}</h3>
+      <div className="country-facts">
+        <p><b>首都</b><span>{selectedAlly.capital}</span></p>
+        <p><b>人口</b><span>{selectedAlly.population}</span></p>
+        <p><b>發展概略</b><span>{selectedAlly.development}</span></p>
+        <p><b>政體</b><span>{selectedAlly.government}</span></p>
+        <p><b>歷史</b><span>{selectedAlly.history}</span></p>
+        <p><b>產業／資源</b><span>{selectedAlly.economy}</span></p>
+      </div>
+      <div className="study-card-note"><b>在地圖上看</b><span>亮起的國家輪廓就是{selectedAlly.name}的位置。</span></div>
+      <button className="text-button" onClick={onClearAlly}>← 返回邦交國列表</button>
+      {canStart && <button className="primary-button small" onClick={onStart}>學會了，開始定位考驗 →</button>}
+    </aside>;
+  }
   if (mode === "allies") {
     return <aside className="country-info study-card ally-study-card">
       <span className="eyebrow">TAIWAN ALLIES · 台灣邦交國</span>
@@ -268,17 +287,24 @@ export default function Home() {
   }
   function startBoss() { setBossQuestions(buildFlagQuestionSet(continent.name)); setQuestionIndex(0); setScore(0); setAnswerState("idle"); setSelectedAnswer(""); setScreen("boss"); }
   function chooseCountry(country: CountryPin) { setSelectedCountry(country); setStudyMode("country"); setStudyCountryId(country.id); setStudyMapCountry(null); setSelectedContinent(Math.max(0, continents.findIndex((item) => item.name === country.continent))); }
+  function chooseStudyAlly(country: CountryPin) {
+    setStudyMode("allies"); setStudyMapCountry(country); setSelectedCountry(null); setStudyCountryId(country.id); setSelectedContinent(Math.max(0, continents.findIndex((item) => item.name === country.continent)));
+  }
   function chooseMapCountry(mapCountry: MapCountrySelection) {
     const country = countryStudyData[mapCountry.name];
     if (!country) return;
     const selected = buildCountryPin(mapCountry.name, mapCountry.x, mapCountry.y);
+    if (studyMode === "allies") {
+      if (taiwanAllyMapNames.includes(mapCountry.name)) chooseStudyAlly(selected);
+      return;
+    }
     chooseCountry(selected);
     setStudyMapCountry(selected);
   }
   function chooseStudyContinent(id: string) { setStudyMode("continent"); setStudyContinentId(id); setStudyMapCountry(null); setSelectedCountry(null); }
   function chooseStudyAllies() { setStudyMode("allies"); setStudyMapCountry(null); setSelectedCountry(null); }
   function chooseStudyCountry(id: string) { const country = allCountryPins.find((item) => item.id === id); if (!country) return; setStudyMode("country"); setStudyCountryId(id); setStudyMapCountry(null); setSelectedCountry(null); }
-  function startStudyChallenge() { const target = studyMode === "country" ? studyCountry : allCountryPins.find((item) => item.continent === studyContinent.name) || allCountryPins[0]; const continentIndex = continents.findIndex((item) => item.name === target.continent); if (continentIndex >= 0) startLocation(continentIndex, target); }
+  function startStudyChallenge() { const target = studyMode === "country" || (studyMode === "allies" && studyMapCountry) ? studyCountry : allCountryPins.find((item) => item.continent === studyContinent.name) || allCountryPins[0]; const continentIndex = continents.findIndex((item) => item.name === target.continent); if (continentIndex >= 0) startLocation(continentIndex, target); }
   function answerMap(x: number, y: number) { if (answerState !== "idle") return; setMarker({ x, y }); const d = Math.sqrt((x - locationTarget.x) ** 2 + (y - locationTarget.y) ** 2); const correct = d < 9; setAnswerState(correct ? "correct" : "wrong"); if (correct) setScore(score + (showHint ? 70 : 100)); }
   function answerFlag(option: string) { if (answerState !== "idle") return; setSelectedAnswer(option); setAnswerState(option === flagQuestion.country ? "correct" : "wrong"); if (option === flagQuestion.country) setScore(score + 100); }
   function nextQuestion() { if (questionIndex + 1 >= total) { const key = screen === "boss" ? continent.id : `${continent.id}-level`; setProgress((old) => ({ ...old, stars: old.stars + Math.max(1, Math.round(score / 10)), completed: screen === "location" && !old.completed.includes(key) ? [...old.completed, key] : old.completed, bosses: screen === "boss" && !old.bosses.includes(key) ? [...old.bosses, key] : old.bosses, unlocked: Math.min(continents.length, Math.max(old.unlocked, selectedContinent + 2)) })); setScreen("result"); return; } setQuestionIndex(questionIndex + 1); setAnswerState("idle"); setSelectedAnswer(""); setMarker(null); setShowHint(false); }
@@ -295,7 +321,7 @@ export default function Home() {
           <div className="study-tabs" role="tablist" aria-label="學習分類"><button className={`study-tab ${studyMode === "continent" ? "active" : ""}`} onClick={() => chooseStudyContinent(studyContinent.id)} role="tab" aria-selected={studyMode === "continent"}>先學七大洲</button><button className={`study-tab ${studyMode === "country" ? "active" : ""}`} onClick={() => chooseStudyCountry(studyCountry.id)} role="tab" aria-selected={studyMode === "country"}>先學國家位置</button><button className={`study-tab ${studyMode === "allies" ? "active" : ""}`} onClick={chooseStudyAllies} role="tab" aria-selected={studyMode === "allies"}>台灣邦交國</button></div>
           {studyMode === "continent" ? <div className="study-choice-row" aria-label="選擇洲">{continents.map((item) => <button key={item.id} className={`study-choice ${studyContinent.id === item.id ? "active" : ""}`} onClick={() => chooseStudyContinent(item.id)}><span>{item.emoji}</span>{item.name}</button>)}</div> : studyMode === "allies" ? <div className="ally-toolbar"><span>🤝 台灣邦交國</span><b>{taiwanAllyPins.length} 國</b><small>點選地圖標記或右側卡片查看介紹</small></div> : <label className="study-select-label">選擇國家<select value={studyCountry.id} onChange={(event) => chooseStudyCountry(event.target.value)}>{continents.map((item) => <optgroup key={item.id} label={`${item.emoji} ${item.name}`}>{allCountryPins.filter((country) => country.continent === item.name).map((country) => <option key={country.id} value={country.id}>{country.flag} {country.name}</option>)}</optgroup>)}</select></label>}
         </div>
-        <div className="map-and-info"><div className="interactive-world-map" aria-label="世界互動地圖"><WorldCountryLayer highlightedNames={studyHighlightNames} selectedName={studyMode === "country" ? studyCountry.mapName : undefined} onCountrySelect={chooseMapCountry} onCountryPositions={setMapPositions} /><div className="map-grid" />{studyMode === "country" && studySpotlight && <><div className={`study-spotlight ${studyMode}`} style={{ left: `${studySpotlight.x}%`, top: `${studySpotlight.y}%` }} aria-hidden="true"><span>✦</span></div><span className="study-location-label" style={{ left: `${studySpotlight.x}%`, top: `${studySpotlight.y}%` }}>{studySpotlight.label}</span></>}<div className="equator" /><span className="equator-label">赤道 EQUATOR</span>{visibleStudyPins.filter((country) => country.mapName !== "Taiwan").map((country) => <MapCountryMarker key={country.id} country={country} anchor={mapPositions[country.mapName] || { x: country.x, y: country.y }} selected={studyMode === "country" && studyCountry.id === country.id} ally={studyMode === "allies"} onClick={() => chooseCountry(country)} />)}<MapCountryMarker key="taiwan-reference" country={taiwanPin} taiwan anchor={mapPositions[taiwanPin.mapName] || { x: taiwanPin.x, y: taiwanPin.y }} selected={studyMode === "country" && studyCountry.id === taiwanPin.id} onClick={() => chooseCountry(taiwanPin)} /><div className="map-compass">N<br /><span>✦</span></div></div><StudyCard mode={studyMode} continent={studyContinent} country={studyCountry} onStart={startStudyChallenge} onSelectCountry={chooseCountry} allies={taiwanAllyPins} canStart={continents.some((item) => item.name === studyCountry.continent)} /></div>
+        <div className="map-and-info"><div className="interactive-world-map" aria-label="世界互動地圖"><WorldCountryLayer highlightedNames={studyHighlightNames} selectedName={studyMode === "country" ? studyCountry.mapName : studyMode === "allies" ? studyMapCountry?.mapName : undefined} onCountrySelect={chooseMapCountry} onCountryPositions={setMapPositions} /><div className="map-grid" />{studyMode === "country" && studySpotlight && <><div className={`study-spotlight ${studyMode}`} style={{ left: `${studySpotlight.x}%`, top: `${studySpotlight.y}%` }} aria-hidden="true"><span>✦</span></div><span className="study-location-label" style={{ left: `${studySpotlight.x}%`, top: `${studySpotlight.y}%` }}>{studySpotlight.label}</span></>}<div className="equator" /><span className="equator-label">赤道 EQUATOR</span>{visibleStudyPins.filter((country) => country.mapName !== "Taiwan").map((country) => <MapCountryMarker key={country.id} country={country} anchor={mapPositions[country.mapName] || { x: country.x, y: country.y }} selected={(studyMode === "country" || studyMode === "allies") && studyCountry.id === country.id} ally={studyMode === "allies"} onClick={() => studyMode === "allies" ? chooseStudyAlly(country) : chooseCountry(country)} />)}<MapCountryMarker key="taiwan-reference" country={taiwanPin} taiwan anchor={mapPositions[taiwanPin.mapName] || { x: taiwanPin.x, y: taiwanPin.y }} selected={studyMode === "country" && studyCountry.id === taiwanPin.id} onClick={() => chooseCountry(taiwanPin)} /><div className="map-compass">N<br /><span>✦</span></div></div><StudyCard mode={studyMode} continent={studyContinent} country={studyCountry} onStart={startStudyChallenge} onSelectCountry={studyMode === "allies" ? chooseStudyAlly : chooseCountry} allies={taiwanAllyPins} selectedAlly={studyMapCountry} onClearAlly={() => setStudyMapCountry(null)} canStart={continents.some((item) => item.name === studyCountry.continent)} /></div>
       </section>
       <section className="continent-section compact"><div className="section-heading"><div><span className="strip-label">THE SEVEN CONTINENTS</span><h2>七大洲任務</h2></div></div><div className="continent-grid">{continents.map((item, index) => <button className={`continent-card ${index > progress.unlocked ? "locked" : ""}`} key={item.id} style={{ "--card-color": item.color } as React.CSSProperties} onClick={() => index <= progress.unlocked && startLocation(index)}><span className="continent-emoji">{item.emoji}</span><h3>{item.name}</h3><span className="english">{item.english}</span><p>{item.fact}</p><span className="card-footer">{index > progress.unlocked ? "🔒 完成前一洲後解鎖" : "進入任務 →"}</span></button>)}</div></section>
     </>}
