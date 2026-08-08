@@ -162,21 +162,12 @@ const taiwanAllyPins = taiwanAllyMapNames.map((mapName) => buildCountryPin(mapNa
 const taiwanPin = countryPins.find((country) => country.mapName === "Taiwan") || buildCountryPin("Taiwan");
 function clampMapValue(value: number, minimum: number, maximum: number) { return Math.max(minimum, Math.min(maximum, value)); }
 function oceanLabelPosition(country: CountryPin, anchor: MapPosition) {
-  const allyLabelOffsets: Record<string, { x: number; y: number }> = {
-    "Marshall Islands": { x: -16, y: -6 }, Palau: { x: -18, y: -7 }, Tuvalu: { x: -16, y: 8 }, eSwatini: { x: -20, y: 0 }, "Holy See": { x: 16, y: 10 },
-    Belize: { x: -15, y: -8 }, Guatemala: { x: -15, y: 5 }, Haiti: { x: 18, y: -8 }, Paraguay: { x: -20, y: 0 }, "St. Kitts and Nevis": { x: 18, y: -7 }, "Saint Lucia": { x: 18, y: -3 }, "Saint Vincent and the Grenadines": { x: 18, y: 5 },
-  };
-  const allyOffset = allyLabelOffsets[country.mapName];
-  if (allyOffset) return { x: clampMapValue(anchor.x + allyOffset.x, 7, 93), y: clampMapValue(anchor.y + allyOffset.y, 7, 92) };
-  const y = clampMapValue(anchor.y, 8, 90);
-  if (country.mapName === "Taiwan") return { x: 88, y: clampMapValue(anchor.y - 3, 8, 90) };
-  if (country.continent === "非洲") return { x: 40, y };
-  if (country.continent === "歐洲") return { x: anchor.x > 58 ? 68 : 42, y: clampMapValue(anchor.y - 4, 8, 90) };
-  if (country.continent === "亞洲") return { x: 88, y };
-  if (country.continent === "北美洲") return { x: anchor.x < 30 ? 11 : 46, y };
-  if (country.continent === "南美洲") return { x: anchor.x < 35 ? 20 : 45, y };
-  if (country.continent === "南極洲") return { x: 65, y: 94 };
-  return { x: 92, y };
+  const y = clampMapValue(anchor.y, 10, 90);
+  if (country.mapName === "Taiwan") return { x: 91, y: clampMapValue(anchor.y - 4, 10, 90) };
+  if (country.continent === "南極洲") return { x: 91, y: 91 };
+  // 旗幟固定移到目標所在陸塊的反側邊緣，確保標記本身落在海洋。
+  const edge = anchor.x < 50 ? 91 : 9;
+  return { x: edge, y };
 }
 
 function MapCountryMarker({ country, anchor, selected, ally = false, taiwan = false, onClick }: { country: CountryPin; anchor: MapPosition; selected: boolean; ally?: boolean; taiwan?: boolean; onClick: () => void }) {
