@@ -40,8 +40,10 @@ button { font: inherit; cursor: pointer; }
 /* Real country borders replace the old hand-drawn continent silhouettes. */
 .country-outline-layer { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; }
 .country-outline { fill: #eadab0; stroke: #a9966d; stroke-width: 1.15; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-.country-outline-active { fill: #f3bd5b; stroke: #8f641f; stroke-width: 1.8; }
-.country-outline-taiwan { fill: #ed8d91; stroke: #a83f4b; stroke-width: 2.2; }
+.country-outline-revealed { fill: var(--country-fill); }
+.country-outline-active { filter: saturate(1.12) brightness(1.03); }
+.country-outline-taiwan { fill: #ed8d91; stroke: #a83f4b; stroke-width: 1.15; }
+.country-outline-revealed.country-outline-taiwan { fill: var(--country-fill); }
 .country-outline { pointer-events: auto; cursor: pointer; }
 .mini-country-layer { opacity: .9; transform: rotate(7deg) scale(1.08); transform-origin: center; }
 .dashboard-subtitle { color: #8a96a2; font-size: 11px; margin: 7px 0 0; }
@@ -93,9 +95,8 @@ button { font: inherit; cursor: pointer; }
 .mini-country-layer .country-outline-muted.country-outline-taiwan { fill: #afc8c5; stroke: #789994; }
 .interactive-world-map { aspect-ratio: 1000 / 520; }
 .map-leader-line { position: absolute; z-index: 5; height: 1px; background: #65879a; transform-origin: left center; pointer-events: none; opacity: .78; }
-.country-outline-active { fill: #d9c4ee; stroke: #7d4caf; stroke-width: 1.9; }
-.country-outline-selected { fill: #83d09b; stroke: #23764c; stroke-width: 2.6; filter: drop-shadow(0 0 3px #23764c80); }
-.country-outline-taiwan.country-outline-selected { fill: #83d09b; stroke: #23764c; }
+.country-outline-selected { stroke: #5f7780; stroke-width: 1.15; filter: none; }
+.country-outline-taiwan.country-outline-selected { stroke: #5f7780; }
 .study-selected-pin { outline: 2px solid #23764c; box-shadow: 0 0 0 4px #83d09b50, 0 7px 18px #263a4a38; }
 .game-map .map-click-layer { z-index: 0; }
 @media (max-width: 520px) { .interactive-world-map { aspect-ratio: 1000 / 520; min-height: 0; } }
