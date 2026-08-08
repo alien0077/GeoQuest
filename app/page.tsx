@@ -19,6 +19,7 @@ type StudyMode = "continent" | "country" | "allies";
 type Spotlight = { x: number; y: number; label: string };
 type MapCountrySelection = { name: string; x: number; y: number };
 type MapPosition = { x: number; y: number };
+type GeoCoordinate = { longitude: number; latitude: number };
 type MapColorMode = "country" | "revealed" | "highlighted";
 
 const mapNameByCountryId: Record<string, string> = {
@@ -34,6 +35,21 @@ const continentSpotlights: Record<string, Spotlight> = {
 };
 
 const countryPalette = ["#f2a07b", "#f5c85f", "#8fc9df", "#d98caf", "#a9d477", "#b9a0dc", "#efa2a2", "#79c6b8", "#e2b879", "#9fb9e8", "#d2a7d1", "#c4d98a"];
+
+const taiwanAllyCoordinates: Record<string, GeoCoordinate> = {
+  "Marshall Islands": { longitude: 171.1845, latitude: 7.1315 },
+  Palau: { longitude: 134.5825, latitude: 7.515 },
+  Tuvalu: { longitude: 179.1962, latitude: -8.5211 },
+  eSwatini: { longitude: 31.4659, latitude: -26.5225 },
+  "Holy See": { longitude: 12.4534, latitude: 41.9029 },
+  Belize: { longitude: -88.4976, latitude: 17.1899 },
+  Guatemala: { longitude: -90.2308, latitude: 15.7835 },
+  Haiti: { longitude: -72.2852, latitude: 18.9712 },
+  Paraguay: { longitude: -58.4438, latitude: -23.4425 },
+  "St. Kitts and Nevis": { longitude: -62.783, latitude: 17.3578 },
+  "Saint Lucia": { longitude: -60.9789, latitude: 13.9094 },
+  "Saint Vincent and the Grenadines": { longitude: -61.2872, latitude: 13.1579 },
+};
 
 function countryColor(mapName: string) {
   const hash = [...mapName].reduce((value, character) => (value * 31 + character.charCodeAt(0)) >>> 0, 7);
@@ -82,9 +98,29 @@ function WorldCountryLayer({ className = "", highlightedNames = [], coloredNames
       .filter((country) => country.d);
   }, [countries, focusContinent]);
 
+  const projectedAllyPositions = useMemo(() => {
+    if (!countries) return {};
+    const focusFeatures = focusContinent
+      ? countries.features.filter((country) => countryStudyData[String(country.properties?.name)]?.continent === focusContinent)
+      : [];
+    const projectionTarget = focusFeatures.length > 0
+      ? { type: "FeatureCollection", features: focusFeatures }
+      : countries;
+    const projection = geoNaturalEarth1().fitExtent(focusContinent ? [[28, 24], [972, 496]] : [[0, 0], [1000, 520]], projectionTarget as never);
+    const positions: Record<string, MapPosition> = {};
+    for (const [name, coordinate] of Object.entries(taiwanAllyCoordinates)) {
+      const point = projection([coordinate.longitude, coordinate.latitude]);
+      if (point) positions[name] = { x: (point[0] / 1000) * 100, y: (point[1] / 520) * 100 };
+    }
+    return positions;
+  }, [countries, focusContinent]);
+
   useEffect(() => {
-    if (onCountryPositions && paths.length) onCountryPositions(Object.fromEntries(paths.map((country) => [String(country.name), { x: (country.x / 1000) * 100, y: (country.y / 520) * 100 }])));
-  }, [onCountryPositions, paths]);
+    if (onCountryPositions && paths.length) onCountryPositions({
+      ...Object.fromEntries(paths.map((country) => [String(country.name), { x: (country.x / 1000) * 100, y: (country.y / 520) * 100 }])),
+      ...projectedAllyPositions,
+    });
+  }, [onCountryPositions, paths, projectedAllyPositions]);
 
   return <svg className={`country-outline-layer ${className}`} viewBox="0 0 1000 520" preserveAspectRatio={preserveAspectRatio} role="img" aria-label="世界各國國界輪廓">
     <title>世界各國國界輪廓</title>
@@ -122,14 +158,16 @@ function buildCountryPin(mapName: string, x = 50, y = 50, id = countryIdByMapNam
 
 const countryPins = Object.entries(featuredCoordinates).map(([mapName, position]) => buildCountryPin(mapName, position.x, position.y));
 const allCountryPins = countryStudyNames.map((mapName) => buildCountryPin(mapName, featuredCoordinates[mapName]?.x, featuredCoordinates[mapName]?.y));
-const taiwanAllyCoordinates: Record<string, { x: number; y: number }> = {
-  "Marshall Islands": { x: 98.02, y: 44.76 }, Palau: { x: 87.74, y: 44.52 }, Tuvalu: { x: 100.21, y: 54.55 }, eSwatini: { x: 54, y: 80 }, "Holy See": { x: 53.2, y: 22.93 },
-  Belize: { x: 26, y: 52 }, Guatemala: { x: 25, y: 55 }, Haiti: { x: 34, y: 53 }, Paraguay: { x: 32, y: 77 }, "St. Kitts and Nevis": { x: 32.6, y: 38.35 }, "Saint Lucia": { x: 33.01, y: 40.52 }, "Saint Vincent and the Grenadines": { x: 32.92, y: 40.99 },
-};
-const taiwanAllyPins = taiwanAllyMapNames.map((mapName) => buildCountryPin(mapName, taiwanAllyCoordinates[mapName].x, taiwanAllyCoordinates[mapName].y));
+const taiwanAllyPins = taiwanAllyMapNames.map((mapName) => buildCountryPin(mapName));
 const taiwanPin = countryPins.find((country) => country.mapName === "Taiwan") || buildCountryPin("Taiwan");
 function clampMapValue(value: number, minimum: number, maximum: number) { return Math.max(minimum, Math.min(maximum, value)); }
 function oceanLabelPosition(country: CountryPin, anchor: MapPosition) {
+  const allyLabelOffsets: Record<string, { x: number; y: number }> = {
+    "Marshall Islands": { x: -16, y: -6 }, Palau: { x: -18, y: -7 }, Tuvalu: { x: -16, y: 8 }, eSwatini: { x: -20, y: 0 }, "Holy See": { x: 16, y: 10 },
+    Belize: { x: -15, y: -8 }, Guatemala: { x: -15, y: 5 }, Haiti: { x: 18, y: -8 }, Paraguay: { x: -20, y: 0 }, "St. Kitts and Nevis": { x: 18, y: -7 }, "Saint Lucia": { x: 18, y: -3 }, "Saint Vincent and the Grenadines": { x: 18, y: 5 },
+  };
+  const allyOffset = allyLabelOffsets[country.mapName];
+  if (allyOffset) return { x: clampMapValue(anchor.x + allyOffset.x, 7, 93), y: clampMapValue(anchor.y + allyOffset.y, 7, 92) };
   const y = clampMapValue(anchor.y, 8, 90);
   if (country.mapName === "Taiwan") return { x: 88, y: clampMapValue(anchor.y - 3, 8, 90) };
   if (country.continent === "非洲") return { x: 40, y };
